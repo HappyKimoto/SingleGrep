@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 )
 
 func check(e error) {
@@ -65,8 +66,7 @@ func getFilesTopOnly(dirIn string, files *[]string, fpPattern string) {
 	re := regexp.MustCompile(fpPattern)
 	fileInfos, err := ioutil.ReadDir(dirIn)
 	check(err)
-	for n, f := range fileInfos {
-		fmt.Printf("n=%d\n", n)
+	for _, f := range fileInfos {
 		if !f.IsDir() {
 			path := filepath.Join(dirIn, f.Name())
 			if re.MatchString(path) {
@@ -97,11 +97,20 @@ func getFilesRecursively(dirIn string, files *[]string, fpPattern string) {
 }
 
 func populateDataTable(matches *[][][]uint8, files *[]string, dataPattern *string) {
+	fmt.Printf("%s Start populateDataTable()\n", getCurrentTime())
+
 	// compile the regular expression
 	re := regexp.MustCompile(*dataPattern)
 
+	fileCount := len(*files)
+	var progress int
+
 	// loop through files
-	for i := 0; i < len(*files); i++ {
+	for i := 0; i < fileCount; i++ {
+		// print progress
+		progress = (i + 1) * 100 / fileCount
+		fmt.Printf("\rProgress %d percent.", progress)
+
 		// read file
 		contents, err := os.ReadFile((*files)[i])
 		check(err)
@@ -112,6 +121,11 @@ func populateDataTable(matches *[][][]uint8, files *[]string, dataPattern *strin
 			*matches = append(*matches, matchesCurrent...)
 		}
 	}
+	fmt.Printf("\r%s Completed populateDataTable()\n", getCurrentTime())
+}
+
+func getCurrentTime() string {
+	return time.Now().Format("15:04:05")
 }
 
 func main() {
@@ -121,16 +135,15 @@ func main() {
 	// get configuration
 	var config GrepConfig
 	getConfig(&config)
-	fmt.Printf("Config = %v\n", config)
+	// fmt.Printf("Config = %v\n", config)
 
 	// get input folder
 	dirIn := getUserInput("Data Folder: ")
 	dirOut := getUserInput("Output Folder: ")
 
-	// populate file list
-	var files []string
-
 	// populate files recursively or top only
+	fmt.Printf("%s Populate files\n", getCurrentTime())
+	var files []string
 	if config.SearchFilesRecursively {
 		getFilesRecursively(dirIn, &files, config.AbsoluteFilePathRegExpPattern)
 	} else {
@@ -140,9 +153,10 @@ func main() {
 	fmt.Printf("File Count = %d\n", len(files))
 
 	// get matches
+	fmt.Printf("%s Find matches\n", getCurrentTime())
 	var matches [][][]uint8
 	populateDataTable(&matches, &files, &config.DataRegExpPattern)
-	fmt.Printf("Match Count = %d\n", len(matches))
+	fmt.Printf("%s Match Count = %d\n", getCurrentTime(), len(matches))
 
 	const firstColumnIndex = 1
 	var sepCol = []byte("\t")  // 0x09 = Tab
@@ -159,7 +173,8 @@ func main() {
 		// append line separator
 		report = append(report, sepLine...)
 	}
-
 	fpOut := filepath.Join(dirOut, config.OutputFileName)
+	fmt.Printf("%s Writing file: %q\n", getCurrentTime(), fpOut)
 	os.WriteFile(fpOut, report, 0)
+	fmt.Printf("%s Completed\n", getCurrentTime())
 }
