@@ -37,7 +37,6 @@ type GrepConfig struct {
 	SearchFilesRecursively        bool
 	DataRegExpPattern             string
 	ColumnHeaderSpaceSeparated    string
-	OutputFileName                string
 }
 
 // {
@@ -45,18 +44,17 @@ type GrepConfig struct {
 //     "SearchFilesRecursively": true,
 //     "DataRegExpPattern": "(..../../.. ..:..:..) ([a-zA-Z]+)",
 //     "ColumnHeaderSpaceSeparated": "DateTime Event",
-//     "OutputFileName": "DateTimeEvent.txt"
 // }
 
 func (gc GrepConfig) String() string {
-	return fmt.Sprintf("GrepConfig; FilePattern=%q; Recursively=%t; RegExp=%q; ColumnHeader=%q; OutFile=%q\n",
+	return fmt.Sprintf("GrepConfig; FilePattern=%q; Recursively=%t; RegExp=%q; ColumnHeader=%q;\n",
 		gc.AbsoluteFilePathRegExpPattern, gc.SearchFilesRecursively, gc.DataRegExpPattern,
-		gc.ColumnHeaderSpaceSeparated, gc.OutputFileName)
+		gc.ColumnHeaderSpaceSeparated)
 }
 
-func getConfig(config *GrepConfig) {
-	fpConfig := getUserInput("Setting JSON: ")
-	bufConfig, err := os.ReadFile(fpConfig)
+func getConfig(config *GrepConfig, fpConfig *string) {
+	*fpConfig = getUserInput("Setting JSON: ")
+	bufConfig, err := os.ReadFile(*fpConfig)
 	check(err)
 	err = json.Unmarshal(bufConfig, &config)
 	check(err)
@@ -134,7 +132,8 @@ func main() {
 
 	// get configuration
 	var config GrepConfig
-	getConfig(&config)
+	var fpConfig string
+	getConfig(&config, &fpConfig)
 	// fmt.Printf("Config = %v\n", config)
 
 	// get input folder
@@ -173,7 +172,8 @@ func main() {
 		// append line separator
 		report = append(report, sepLine...)
 	}
-	fpOut := filepath.Join(dirOut, config.OutputFileName)
+	fnOut := strings.Split(filepath.Base(fpConfig), ".")[0]
+	fpOut := filepath.Join(dirOut, fnOut+".txt")
 	fmt.Printf("%s Writing file: %q\n", getCurrentTime(), fpOut)
 	os.WriteFile(fpOut, report, 0)
 	fmt.Printf("%s Completed\n", getCurrentTime())
