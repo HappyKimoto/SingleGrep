@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 )
@@ -35,16 +36,10 @@ func getUserInput(promptMessage string) string {
 type GrepConfig struct {
 	AbsoluteFilePathRegExpPattern string
 	SearchFilesRecursively        bool
+	SortFilesByModTime            bool
 	DataRegExpPattern             string
 	ColumnHeaderSpaceSeparated    string
 }
-
-// {
-//     "AbsoluteFilePathRegExpPattern": ".*txt",
-//     "SearchFilesRecursively": true,
-//     "DataRegExpPattern": "(..../../.. ..:..:..) ([a-zA-Z]+)",
-//     "ColumnHeaderSpaceSeparated": "DateTime Event",
-// }
 
 func (gc GrepConfig) String() string {
 	return fmt.Sprintf("GrepConfig; FilePattern=%q; Recursively=%t; RegExp=%q; ColumnHeader=%q;\n",
@@ -58,6 +53,23 @@ func getConfig(config *GrepConfig, fpConfig *string) {
 	check(err)
 	err = json.Unmarshal(bufConfig, &config)
 	check(err)
+}
+
+func isFile(dirIn string, files *[]string, fpPattern string) bool {
+	// check if file path regular expression matches
+	re := regexp.MustCompile(fpPattern)
+	if !re.Match([]byte(dirIn)) {
+		panic("ERROR: AbsoluteFilePathRegExpPattern failed to match!")
+	}
+
+	// check if file is a folder
+	fileInfo, err := os.Stat(dirIn)
+	check(err)
+	if fileInfo.IsDir() {
+		return false
+	} else {
+		return true
+	}
 }
 
 func getFilesTopOnly(dirIn string, files *[]string, fpPattern string) {
@@ -126,6 +138,18 @@ func getCurrentTime() string {
 	return time.Now().Format("15:04:05")
 }
 
+func getFileModTime(fp string) int64 {
+	obj, err := os.Stat(fp)
+	check(err)
+	return obj.ModTime().Unix()
+}
+
+func SortFilesByModTime(files *[]string) {
+	sort.Slice(*files, func(i, j int) bool {
+		return getFileModTime((*files)[i]) < getFileModTime((*files)[j])
+	})
+}
+
 func main() {
 	// title
 	fmt.Println("======= Single Grep ========")
@@ -140,16 +164,23 @@ func main() {
 	dirIn := getUserInput("Data Folder: ")
 	dirOut := getUserInput("Output Folder: ")
 
-	// populate files recursively or top only
+	// populate files
 	fmt.Printf("%s Populate files\n", getCurrentTime())
 	var files []string
-	if config.SearchFilesRecursively {
+	if isFile(dirIn, &files, config.AbsoluteFilePathRegExpPattern) {
+		files = append(files, dirIn)
+	} else if config.SearchFilesRecursively {
 		getFilesRecursively(dirIn, &files, config.AbsoluteFilePathRegExpPattern)
 	} else {
 		getFilesTopOnly(dirIn, &files, config.AbsoluteFilePathRegExpPattern)
 	}
-
 	fmt.Printf("File Count = %d\n", len(files))
+
+	// sort files by mod time
+	if config.SortFilesByModTime {
+		SortFilesByModTime(&files)
+		fmt.Printf("%s Files are sorted by Mod Time.\n", getCurrentTime())
+	}
 
 	// get matches
 	fmt.Printf("%s Find matches\n", getCurrentTime())
