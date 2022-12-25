@@ -56,18 +56,22 @@ func getConfig(config *GrepConfig, fpConfig *string) {
 }
 
 func isFile(dirIn string, files *[]string, fpPattern string) bool {
-	// check if file path regular expression matches
-	re := regexp.MustCompile(fpPattern)
-	if !re.Match([]byte(dirIn)) {
-		panic("ERROR: AbsoluteFilePathRegExpPattern failed to match!")
-	}
 
 	// check if file is a folder
 	fileInfo, err := os.Stat(dirIn)
 	check(err)
 	if fileInfo.IsDir() {
+		// === Directory ====
+		// isFile() returns False
 		return false
 	} else {
+		// === File ===
+		// check if file path regular expression matches
+		re := regexp.MustCompile(fpPattern)
+		if !re.Match([]byte(dirIn)) {
+			panic("Pattern Error: fpPattern does not match dirIn!")
+		}
+		// isFile() returns True (because fpPattern matched)
 		return true
 	}
 }
